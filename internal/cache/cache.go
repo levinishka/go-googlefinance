@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/ristretto"
+	"github.com/dgraph-io/ristretto/v2"
 )
 
 type Cache struct {
-	client *ristretto.Cache
+	client *ristretto.Cache[string, float64]
 	ttl    time.Duration
 }
 
 func NewCache(numCounters int64, ttlInSec int64) (*Cache, error) {
-	client, err := ristretto.NewCache(&ristretto.Config{
+	client, err := ristretto.NewCache(&ristretto.Config[string, float64]{
 		NumCounters: numCounters,
 		MaxCost:     numCounters,
 		BufferItems: 64,
@@ -28,16 +28,12 @@ func NewCache(numCounters int64, ttlInSec int64) (*Cache, error) {
 	}, nil
 }
 
-func (c *Cache) Set(key string, value float64) {
-	c.client.SetWithTTL(key, value, 1, c.ttl)
+func (c *Cache) Set(key string, value float64) bool {
+	return c.client.SetWithTTL(key, value, 1, c.ttl)
 }
 
 func (c *Cache) Get(key string) (float64, bool) {
-	if value, found := c.client.Get(key); found {
-		return value.(float64), found
-	}
-
-	return -1, false
+	return c.client.Get(key)
 }
 
 func (c *Cache) Clear() {

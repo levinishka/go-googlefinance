@@ -139,5 +139,5 @@ func (m *GoogleFinanceManager) readPricesWithRetry(columnRange string) (*sheets.
 		time.Sleep(time.Duration(i+1) * time.Second)
 	}
 
-	return nil, fmt.Errorf("readPricesWithRetry: unable to read formulas: %v", err)
+	return nil, fmt.Errorf("readPricesWithRetry: unable to read formulas after %d retries: %v", numOfRetries, err)
 }

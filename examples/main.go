@@ -21,32 +21,7 @@ func main() {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
-	// res, err := googleFinanceClient.ReadPrices([]string{"VTI", "VGT"})
 	res, err := googleFinanceClient.ReadPrices([]string{"VTI", "VGT", "GE", "T"})
-	if err != nil {
-		log.Fatalf("Failed to read prices: %v", err)
-	}
-	fmt.Println(res)
-
-	time.Sleep(2 * time.Second)
-
-	res, err = googleFinanceClient.ReadPrices([]string{"VTI", "VGT", "GE", "T", "NO_TICKER"})
-	if err != nil {
-		log.Fatalf("Failed to read prices: %v", err)
-	}
-	fmt.Println(res)
-
-	time.Sleep(2 * time.Second)
-
-	res, err = googleFinanceClient.ReadPrices([]string{"VTI", "VGT", "GE", "T", "NO_TICKER"})
-	if err != nil {
-		log.Fatalf("Failed to read prices: %v", err)
-	}
-	fmt.Println(res)
-
-	time.Sleep(2 * time.Second)
-
-	res, err = googleFinanceClient.ReadPrices([]string{"VTI", "VGT", "GE", "T", "NO_TICKER"})
 	if err != nil {
 		log.Fatalf("Failed to read prices: %v", err)
 	}
