@@ -7,7 +7,8 @@ import (
 type Config struct {
 	CredentialsPath         string
 	SpreadsheetId           string
-	TtlInSec                int64
+	CacheSize               int64
+	CacheTtlInSec           int64
 	BalancerNumberOfThreads int
 }
 
@@ -19,7 +20,8 @@ func NewGoogleFinanceClient(clientConfig *Config) (*GoogleFinanceClient, error) 
 	config := &manager.Config{
 		CredentialsPath:         clientConfig.CredentialsPath,
 		SpreadsheetId:           clientConfig.SpreadsheetId,
-		TtlInSec:                clientConfig.TtlInSec,
+		CacheSize:               clientConfig.CacheSize,
+		CacheTtlInSec:           clientConfig.CacheTtlInSec,
 		BalancerNumberOfThreads: clientConfig.BalancerNumberOfThreads,
 	}
 	mngr, err := manager.NewGoogleFinanceManager(config)

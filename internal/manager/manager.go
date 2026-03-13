@@ -20,7 +20,8 @@ const googleFinancePriceCommand string = `=GOOGLEFINANCE("%s", "price")`
 type Config struct {
 	CredentialsPath         string
 	SpreadsheetId           string
-	TtlInSec                int64
+	CacheSize               int64
+	CacheTtlInSec           int64
 	BalancerNumberOfThreads int
 }
 
@@ -37,27 +38,27 @@ func NewGoogleFinanceManager(managerConfig *Config) (*GoogleFinanceManager, erro
 
 	credentials, err := os.ReadFile(managerConfig.CredentialsPath)
 	if err != nil {
-		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to read credentials: %v", err)
+		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to read credentials: %w", err)
 	}
 
 	config, err := google.JWTConfigFromJSON(credentials, sheets.SpreadsheetsScope)
 	if err != nil {
-		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to parse credentials: %v", err)
+		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to parse credentials: %w", err)
 	}
 
 	service, err := sheets.NewService(ctx, option.WithHTTPClient(config.Client(context.Background())))
 	if err != nil {
-		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to create Sheets service: %v", err)
+		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to create Sheets service: %w", err)
 	}
 
 	balancer, err := balancer.NewGoogleFinanceBalancer(managerConfig.BalancerNumberOfThreads)
 	if err != nil {
-		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to create balancer: %v", err)
+		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to create balancer: %w", err)
 	}
 
-	cache, err := cache.NewCache(1e4, managerConfig.TtlInSec)
+	cache, err := cache.NewCache(managerConfig.CacheSize, managerConfig.CacheTtlInSec)
 	if err != nil {
-		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to create cache: %v", err)
+		return nil, fmt.Errorf("NewGoogleFinanceManager: failed to create cache: %w", err)
 	}
 
 	return &GoogleFinanceManager{
@@ -98,12 +99,12 @@ func (m *GoogleFinanceManager) ReadPrices(tickers []string) (map[string]float64,
 		Values: formulas,
 	}).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
-		return nil, fmt.Errorf("ReadPrices: unable to write formulas: %v", err)
+		return nil, fmt.Errorf("ReadPrices: unable to write formulas: %w", err)
 	}
 
 	resp, err := m.readPricesWithRetry(columnRange)
 	if err != nil {
-		return nil, fmt.Errorf("ReadPrices: unable to read formulas: %v", err)
+		return nil, fmt.Errorf("ReadPrices: unable to read formulas: %w", err)
 	}
 
 	for i, price := range resp.Values {
@@ -118,7 +119,7 @@ func (m *GoogleFinanceManager) ReadPrices(tickers []string) (map[string]float64,
 
 	_, err = m.service.Spreadsheets.Values.Clear(m.spreadsheetId, columnRange, &sheets.ClearValuesRequest{}).Do()
 	if err != nil {
-		return nil, fmt.Errorf("ReadPrices: unable to clear formulas: %v", err)
+		return nil, fmt.Errorf("ReadPrices: unable to clear formulas: %w", err)
 	}
 
 	return res, nil
@@ -127,7 +128,7 @@ func (m *GoogleFinanceManager) ReadPrices(tickers []string) (map[string]float64,
 func (m *GoogleFinanceManager) readPricesWithRetry(columnRange string) (*sheets.ValueRange, error) {
 	numOfRetries := 3
 	var err error
-	for i := 0; i < numOfRetries; i++ {
+	for i := range numOfRetries {
 		if resp, err := m.service.Spreadsheets.Values.Get(m.spreadsheetId, columnRange).Do(); err == nil && len(resp.Values) > 0 {
 			return resp, err
 		}
@@ -135,9 +136,9 @@ func (m *GoogleFinanceManager) readPricesWithRetry(columnRange string) (*sheets.
 		if i == numOfRetries-1 {
 			break
 		}
-		fmt.Printf("unsuccessful reading from sheet, retry %d, sleep for %d", i, i+1)
+		fmt.Printf("unsuccessful reading from sheet, retry %d, sleep for %d seconds\n", i, i+1)
 		time.Sleep(time.Duration(i+1) * time.Second)
 	}
 
-	return nil, fmt.Errorf("readPricesWithRetry: unable to read formulas after %d retries: %v", numOfRetries, err)
+	return nil, fmt.Errorf("readPricesWithRetry: unable to read formulas after %d retries: %w", numOfRetries, err)
 }

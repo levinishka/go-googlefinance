@@ -19,7 +19,7 @@ func NewCache(numCounters int64, ttlInSec int64) (*Cache, error) {
 		BufferItems: 64,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("NewCache: unable to initialize new cache: %v", err)
+		return nil, fmt.Errorf("NewCache: unable to initialize new cache: %w", err)
 	}
 
 	return &Cache{
