@@ -19,20 +19,22 @@ func main() {
 	}
 	googleFinanceClient, err := finance.NewGoogleFinanceClient(config)
 	if err != nil {
-		log.Fatalf("Failed to create client: %w", err)
+		log.Fatalf("Failed to create client: %v", err)
 	}
 
 	res, err := googleFinanceClient.ReadPrices([]string{"VTI", "VGT", "GE", "T"})
 	if err != nil {
-		log.Fatalf("Failed to read prices: %w", err)
+		log.Fatalf("Failed to read prices: %v", err)
 	}
 	fmt.Println(res)
 
 	time.Sleep(2 * time.Second)
 
-	res, err = googleFinanceClient.ReadPrices([]string{"VTI", "VGT", "GE", "T", "NO_TICKER"})
+	assets, err := googleFinanceClient.ReadAssets([]string{"VTI", "VGT", "GE", "T", "NO_TICKER"})
 	if err != nil {
-		log.Fatalf("Failed to read prices: %w", err)
+		log.Fatalf("Failed to read assets: %v", err)
 	}
-	fmt.Println(res)
+	for ticker, info := range assets {
+		fmt.Printf("%s: price=%.2f name=%q currency=%q\n", ticker, info.Price, info.Name, info.Currency)
+	}
 }

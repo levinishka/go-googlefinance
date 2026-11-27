@@ -1,40 +1,63 @@
 package balancer
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
-var elements = [...]string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+type ColumnSlot struct {
+	Start string
+	End   string
+}
 
 type GoogleFinanceBalancer struct {
 	numberOfThreads int
 
-	ch chan string
+	ch chan ColumnSlot
 }
 
-func NewGoogleFinanceBalancer(numberOfThreads int) (*GoogleFinanceBalancer, error) {
-	if numberOfThreads > len(elements) {
-		return nil, fmt.Errorf("NewGoogleFinanceBalancer: currently only %d threads is supported, %d given", len(elements), numberOfThreads)
+func columnName(index int) string {
+	name := ""
+	for index >= 0 {
+		name = string(rune('A'+(index%26))) + name
+		index = index/26 - 1
 	}
+	return name
+}
 
+func NewGoogleFinanceBalancer(numberOfThreads int, columnsPerSlot int) (*GoogleFinanceBalancer, error) {
 	if numberOfThreads <= 0 {
 		return nil, fmt.Errorf("NewGoogleFinanceBalancer: numberOfThreads should be > 0, %d given", numberOfThreads)
 	}
 
-	balancer := &GoogleFinanceBalancer{
-		numberOfThreads: numberOfThreads,
-		ch:              make(chan string, numberOfThreads),
+	if columnsPerSlot <= 0 {
+		return nil, fmt.Errorf("NewGoogleFinanceBalancer: columnsPerSlot should be > 0, %d given", columnsPerSlot)
 	}
 
-	for _, elem := range elements[:numberOfThreads] {
-		balancer.ch <- elem
+	balancer := &GoogleFinanceBalancer{
+		numberOfThreads: numberOfThreads,
+		ch:              make(chan ColumnSlot, numberOfThreads),
+	}
+
+	for i := 0; i < numberOfThreads; i++ {
+		balancer.ch <- ColumnSlot{
+			Start: columnName(i * columnsPerSlot),
+			End:   columnName((i+1)*columnsPerSlot - 1),
+		}
 	}
 
 	return balancer, nil
 }
 
-func (b *GoogleFinanceBalancer) Acquire() string {
-	return <-b.ch
+func (b *GoogleFinanceBalancer) Acquire(ctx context.Context) (ColumnSlot, error) {
+	select {
+	case slot := <-b.ch:
+		return slot, nil
+	case <-ctx.Done():
+		return ColumnSlot{}, ctx.Err()
+	}
 }
 
-func (b *GoogleFinanceBalancer) Release(element string) {
-	b.ch <- element
+func (b *GoogleFinanceBalancer) Release(slot ColumnSlot) {
+	b.ch <- slot
 }

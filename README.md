@@ -17,9 +17,12 @@ A Golang package to fetch stock prices from [Google Finance](https://www.google.
 ### 📄 2. Create a new Google Sheet and share access
 
 1. Go to [Google Drive](https://drive.google.com/) and create a new Google Sheet
-2. Copy the **email address** of your [service account](https://console.cloud.google.com/iam-admin/serviceaccounts)
-3. [Share the sheet](https://support.google.com/a/users/answer/13309904) with that email and assign the **Editor** role
-4. [Get your Google Sheet ID](https://developers.google.com/workspace/sheets/api/guides/concepts) - it's the string in the URL between `/d/` and `/edit`
+2. Rename the sheet tab to **`price`** (or set `SheetName` in `finance.Config` to match your tab name)
+3. Copy the **email address** of your [service account](https://console.cloud.google.com/iam-admin/serviceaccounts)
+4. [Share the sheet](https://support.google.com/a/users/answer/13309904) with that email and assign the **Editor** role
+5. [Get your Google Sheet ID](https://developers.google.com/workspace/sheets/api/guides/concepts) - it's the string in the URL between `/d/` and `/edit`
+
+> **Note on columns & concurrency:** Each concurrent thread (`BalancerNumberOfThreads`) uses **3 columns** (`price`, `name`, `currency`). A new Google Sheet has 26 columns (`A`–`Z`) by default, which supports up to **8** concurrent threads (`A:X`). If you configure `BalancerNumberOfThreads > 8`, add extra columns to the sheet first.
 
 
 ### 🌍 3. Set environment variables
@@ -52,7 +55,8 @@ func main() {
 	config := &finance.Config{
 		CredentialsPath:         os.Getenv("GOOGLE_SHEETS_CREDENTIALS"),
 		SpreadsheetId:           os.Getenv("GOOGLE_SHEETS_ID"),
-		TtlInSec:                300,
+		CacheSize:               1e4,
+		CacheTtlInSec:           300,
 		BalancerNumberOfThreads: 3,
 	}
 	googleFinanceClient, err := finance.NewGoogleFinanceClient(config)
@@ -60,10 +64,16 @@ func main() {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
-	res, err := googleFinanceClient.ReadPrices([]string{"VTI", "VGT", "GE", "T"})
+	prices, err := googleFinanceClient.ReadPrices([]string{"VTI", "VGT", "GE", "T"})
 	if err != nil {
 		log.Fatalf("Failed to read prices: %v", err)
 	}
-	fmt.Println(res)
+	fmt.Println(prices)
+
+	assets, err := googleFinanceClient.ReadAssets([]string{"VTI", "VGT", "GE", "T"})
+	if err != nil {
+		log.Fatalf("Failed to read assets: %v", err)
+	}
+	fmt.Println(assets)
 }
 ```

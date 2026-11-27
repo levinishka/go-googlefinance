@@ -2,40 +2,79 @@ package cache
 
 import (
 	"fmt"
+	"sync"
 	"time"
-
-	"github.com/dgraph-io/ristretto/v2"
 )
 
-type Cache struct {
-	client *ristretto.Cache[string, float64]
-	ttl    time.Duration
+type entry[V any] struct {
+	value     V
+	expiresAt time.Time
 }
 
-func NewCache(numCounters int64, ttlInSec int64) (*Cache, error) {
-	client, err := ristretto.NewCache(&ristretto.Config[string, float64]{
-		NumCounters: numCounters,
-		MaxCost:     numCounters,
-		BufferItems: 64,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("NewCache: unable to initialize new cache: %w", err)
+type Cache[V any] struct {
+	mu      sync.RWMutex
+	entries map[string]entry[V]
+	maxSize int64
+	ttl     time.Duration
+}
+
+func NewCache[V any](maxSize int64, ttlInSec int64) (*Cache[V], error) {
+	if maxSize <= 0 {
+		return nil, fmt.Errorf("NewCache: maxSize should be > 0, %d given", maxSize)
 	}
 
-	return &Cache{
-		client: client,
-		ttl:    time.Duration(ttlInSec) * time.Second,
+	return &Cache[V]{
+		entries: make(map[string]entry[V]),
+		maxSize: maxSize,
+		ttl:     time.Duration(ttlInSec) * time.Second,
 	}, nil
 }
 
-func (c *Cache) Set(key string, value float64) bool {
-	return c.client.SetWithTTL(key, value, 1, c.ttl)
+func (c *Cache[V]) Set(key string, value V) bool {
+	if c.ttl <= 0 {
+		return false
+	}
+
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if _, exists := c.entries[key]; !exists && int64(len(c.entries)) >= c.maxSize {
+		for k, e := range c.entries {
+			if now.After(e.expiresAt) {
+				delete(c.entries, k)
+			}
+		}
+		if int64(len(c.entries)) >= c.maxSize {
+			for k := range c.entries {
+				delete(c.entries, k)
+				break
+			}
+		}
+	}
+
+	c.entries[key] = entry[V]{
+		value:     value,
+		expiresAt: now.Add(c.ttl),
+	}
+	return true
 }
 
-func (c *Cache) Get(key string) (float64, bool) {
-	return c.client.Get(key)
+func (c *Cache[V]) Get(key string) (V, bool) {
+	c.mu.RLock()
+	e, found := c.entries[key]
+	c.mu.RUnlock()
+
+	if !found || time.Now().After(e.expiresAt) {
+		var zero V
+		return zero, false
+	}
+
+	return e.value, true
 }
 
-func (c *Cache) Clear() {
-	c.client.Clear()
+func (c *Cache[V]) Clear() {
+	c.mu.Lock()
+	c.entries = make(map[string]entry[V])
+	c.mu.Unlock()
 }

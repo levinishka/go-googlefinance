@@ -2,15 +2,7 @@ module github.com/levinishka/go-googlefinance
 
 go 1.23.3
 
-require (
-	github.com/dgraph-io/ristretto/v2 v2.2.0
-	google.golang.org/api v0.228.0
-)
-
-require (
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
-)
+require google.golang.org/api v0.228.0
 
 require (
 	cloud.google.com/go/auth v0.15.0 // indirect
